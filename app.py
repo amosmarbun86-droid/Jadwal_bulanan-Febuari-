@@ -1,126 +1,170 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from datetime import datetime, timedelta
-import holidays
+from datetime import date, timedelta
 
 st.set_page_config(page_title="Jadwal Shift", layout="wide")
 
 # =====================
-# SHIFT CONFIG
+# LOAD USERS
 # =====================
-SHIFT_MAP = {
-    "1": {"name": "Malam", "time": "00:00–09:00", "color": "#8B5CF6"},
-    "2": {"name": "Pagi", "time": "08:00–17:00", "color": "#22C55E"},
-    "3": {"name": "Sore", "time": "16:00–01:00", "color": "#F59E0B"},
-    "OFF": {"name": "OFF", "time": "-", "color": "#EF4444"},
+users = pd.read_csv("users.csv")
+
+# =====================
+# LOGIN
+# =====================
+if "login" not in st.session_state:
+    st.session_state.login = False
+
+if not st.session_state.login:
+    st.title("🔐 Login Jadwal Shift")
+
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        user = users[(users.username == u) & (users.password == p)]
+        if not user.empty:
+            st.session_state.login = True
+            st.session_state.role = user.iloc[0].role
+            st.session_state.nama = user.iloc[0].nama
+            st.success("Login berhasil")
+            st.rerun()
+        else:
+            st.error("Username / Password salah")
+
+    st.stop()
+
+# =====================
+# AUTO TAHUN & CSV
+# =====================
+tahun = date.today().year
+df = pd.read_csv(f"jadwal_{tahun}.csv")
+
+SHIFT_INFO = {
+    "1": ("🌙 Malam", "22:00–06:00", "#6366F1"),
+    "2": ("🌅 Pagi", "08:00–16:00", "#22C55E"),
+    "3": ("🌇 Sore", "16:00–01:00", "#F97316"),
+    "OFF": ("❌ OFF", "", "#EF4444")
+}
+
+LIBUR_NASIONAL = {
+    "01-01": "🎉 Tahun Baru",
+    "02-10": "🎉 Imlek",
+    "03-29": "🎉 Nyepi",
+    "04-18": "🎉 Wafat Isa Almasih",
+    "05-01": "🎉 Hari Buruh",
+    "08-17": "🎉 HUT RI 🇮🇩",
+    "12-25": "🎉 Natal"
 }
 
 # =====================
-# LOAD CSV
+# HEADER
 # =====================
-df = pd.read_csv("jadwal.csv")
+st.sidebar.success(f"👤 {st.session_state.nama}")
+if st.sidebar.button("Logout"):
+    st.session_state.clear()
+    st.rerun()
+
+st.title(f"📅 Jadwal Shift {tahun}")
 
 # =====================
-# PILIH NAMA
+# FILTER USER
 # =====================
-nama = st.selectbox("👤 Pilih Nama", df["NAMA"].unique())
-row = df[df["NAMA"] == nama].iloc[0]
+if st.session_state.role == "user":
+    df = df[df["NAMA"] == st.session_state.nama]
 
 # =====================
-# LIBUR NASIONAL
+# NOTIFIKASI BESOK
 # =====================
-year = datetime.now().year
-id_holidays = holidays.Indonesia(years=year)
+besok = date.today() + timedelta(days=1)
+tgl_besok = str(besok.day)
 
-# =====================
-# NOTIF SHIFT BESOK
-# =====================
-tomorrow = datetime.now() + timedelta(days=1)
-tomorrow_day = tomorrow.day
-
-if str(tomorrow_day) in row:
-    shift_val = str(row[str(tomorrow_day)])
-    shift_info = SHIFT_MAP.get(shift_val, SHIFT_MAP["OFF"])
-
-    st.info(
-        f"⏰ Shift Besok ({tomorrow_day}) : "
-        f"{shift_info['name']} {shift_info['time']}"
-    )
+st.info(f"🔔 Shift BESOK ({besok.strftime('%d %B %Y')})")
+for _, r in df.iterrows():
+    kode = str(r[tgl_besok])
+    nama, jam, _ = SHIFT_INFO.get(kode, ("", "", ""))
+    st.write(f"• {r['NAMA']} → {nama} {jam}")
 
 # =====================
-# STYLE
+# KALENDER 1 TAHUN
 # =====================
-st.markdown("""
-<style>
-.card {
-    background:#0f172a;
-    border-radius:16px;
-    padding:14px;
-    text-align:center;
-    box-shadow:0 4px 14px rgba(0,0,0,.4);
-    color:white;
-    cursor:pointer;
-}
-.day {font-size:18px;font-weight:bold;}
-.shift {font-size:15px;font-weight:600;margin-top:6px;}
-.time {font-size:12px;opacity:.85;}
-.holiday {font-size:11px;color:#f87171;}
-</style>
-""", unsafe_allow_html=True)
+for bulan in range(1, 13):
+    st.markdown("---")
+    st.subheader(f"📆 {calendar.month_name[bulan]}")
 
-# =====================
-# MODE 1 TAHUN
-# =====================
-for month in range(1, 13):
-
-    st.subheader(f"📅 {calendar.month_name[month]} {year}")
-
-    days = calendar.monthrange(year, month)[1]
-
+    hari_bulan = calendar.monthrange(tahun, bulan)[1]
     cols = st.columns(7)
+    hari = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
 
-    for day in range(1, days + 1):
+    for i, h in enumerate(hari):
+        cols[i].markdown(f"**{h}**")
 
-        col = cols[(day - 1) % 7]
+    start = date(tahun, bulan, 1).weekday()
+    row = cols
 
-        val = str(row.get(str(day), "OFF"))
-        shift = SHIFT_MAP.get(val, SHIFT_MAP["OFF"])
+    for i in range(start):
+        row[i].markdown(" ")
 
-        date_obj = datetime(year, month, day)
-        holiday_name = id_holidays.get(date_obj)
+    for tgl in range(1, hari_bulan + 1):
+        col = (start + tgl - 1) % 7
+        label = str(tgl)
 
-        with col:
+        key_libur = f"{bulan:02d}-{tgl:02d}"
+        if key_libur in LIBUR_NASIONAL:
+            label += f"\n{LIBUR_NASIONAL[key_libur]}"
 
-            if st.button(f"{day}", key=f"{month}-{day}"):
+        if row[col].button(label, key=f"{bulan}-{tgl}"):
+            st.session_state.popup = (bulan, tgl)
 
-                st.popup(
-                    f"Detail {day}-{month}-{year}",
-                    lambda: st.write(
-                        f"""
-                        👤 {nama}
-                        
-                        🕒 {shift['name']}
-                        
-                        ⏰ {shift['time']}
-                        
-                        🎉 {holiday_name if holiday_name else 'Bukan hari libur'}
-                        """
-                    )
-                )
+        if col == 6:
+            row = st.columns(7)
 
-            st.markdown(
-                f"""
-                <div class="card">
-                    <div class="day">{day}</div>
-                    <div class="shift" style="color:{shift['color']}">
-                        {shift['name']}
-                    </div>
-                    <div class="time">{shift['time']}</div>
-                    <div class="holiday">
-                        {"🎉 " + holiday_name if holiday_name else ""}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+# =====================
+# POPUP DETAIL
+# =====================
+if "popup" in st.session_state:
+    bulan, tgl = st.session_state.popup
+    st.markdown("---")
+    st.subheader(f"📌 Detail Shift {tgl} {calendar.month_name[bulan]}")
+
+    for _, r in df.iterrows():
+        kode = str(r[str(tgl)])
+        nama, jam, warna = SHIFT_INFO.get(kode, ("", "", "#999"))
+
+        st.markdown(
+            f"""
+            <div style="padding:10px;
+                        border-left:5px solid {warna};
+                        background:#0f172a;
+                        margin-bottom:6px;
+                        border-radius:8px;
+                        color:white;">
+                <b>{r['NAMA']}</b><br>
+                <span style="color:{warna}">{nama}</span><br>
+                <small>{jam}</small>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    if st.button("❌ Tutup"):
+        del st.session_state.popup
+
+# =====================
+# ADMIN PANEL
+# =====================
+if st.session_state.role == "admin":
+    st.sidebar.markdown("## 🛠️ Admin Panel")
+
+    upload = st.sidebar.file_uploader("Upload CSV Baru", type="csv")
+    if upload:
+        with open(f"jadwal_{tahun}.csv", "wb") as f:
+            f.write(upload.getbuffer())
+        st.sidebar.success("CSV berhasil diupdate")
+
+    st.sidebar.download_button(
+        "⬇️ Download CSV",
+        data=df.to_csv(index=False),
+        file_name=f"jadwal_{tahun}.csv"
+    )
