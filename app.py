@@ -1,8 +1,11 @@
+import holidays
+from datetime import date
 import streamlit as st
 import pandas as pd
 import os
 import calendar
 from datetime import date
+ID_HOLIDAYS = holidays.Indonesia()
 
 # =============================
 # PAGE CONFIG
@@ -88,7 +91,12 @@ def get_holiday(d):
     if d.weekday() == 6:
         return "Hari Minggu"
     return None
-
+ID_HOLIDAYS = holidays.Indonesia()
+def cek_libur(tgl):
+    if tgl in ID_HOLIDAYS:
+        return ID_HOLIDAYS[tgl]
+    return None
+    
 # =============================
 # KALENDER
 # =============================
@@ -109,7 +117,7 @@ for week in cal:
             cols[i].markdown(
                 f"""
                 <div class="box">
-                    <div class="date">{day}</div>
+                    {"<div style='font-size:9px;color:red'>🎌 Libur Nasional</div>" if cek_libur(date(tahun_pilih, bulan, day)) else ""}
                     <div class="shift" style="color:{color}">{label}</div>
                     <div class="time">{jam}</div>
                     {"<div class='holiday'>🎌 "+holiday+"</div>" if holiday else ""}
