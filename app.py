@@ -1,171 +1,126 @@
 import streamlit as st
 import pandas as pd
 import calendar
-import os
-from datetime import date
+from datetime import datetime, timedelta
 import holidays
 
-# =============================
-# PAGE CONFIG
-# =============================
-st.set_page_config(
-    page_title="Jadwal Shift",
-    layout="wide"
-)
+st.set_page_config(page_title="Jadwal Shift", layout="wide")
 
-# =============================
-# CSS (MINIMAL & MOBILE FRIENDLY)
-# =============================
+# =====================
+# SHIFT CONFIG
+# =====================
+SHIFT_MAP = {
+    "1": {"name": "Malam", "time": "00:00–09:00", "color": "#8B5CF6"},
+    "2": {"name": "Pagi", "time": "08:00–17:00", "color": "#22C55E"},
+    "3": {"name": "Sore", "time": "16:00–01:00", "color": "#F59E0B"},
+    "OFF": {"name": "OFF", "time": "-", "color": "#EF4444"},
+}
+
+# =====================
+# LOAD CSV
+# =====================
+df = pd.read_csv("jadwal.csv")
+
+# =====================
+# PILIH NAMA
+# =====================
+nama = st.selectbox("👤 Pilih Nama", df["NAMA"].unique())
+row = df[df["NAMA"] == nama].iloc[0]
+
+# =====================
+# LIBUR NASIONAL
+# =====================
+year = datetime.now().year
+id_holidays = holidays.Indonesia(years=year)
+
+# =====================
+# NOTIF SHIFT BESOK
+# =====================
+tomorrow = datetime.now() + timedelta(days=1)
+tomorrow_day = tomorrow.day
+
+if str(tomorrow_day) in row:
+    shift_val = str(row[str(tomorrow_day)])
+    shift_info = SHIFT_MAP.get(shift_val, SHIFT_MAP["OFF"])
+
+    st.info(
+        f"⏰ Shift Besok ({tomorrow_day}) : "
+        f"{shift_info['name']} {shift_info['time']}"
+    )
+
+# =====================
+# STYLE
+# =====================
 st.markdown("""
 <style>
-body { background:#0E1117; }
-
-.title {
+.card {
+    background:#0f172a;
+    border-radius:16px;
+    padding:14px;
     text-align:center;
-    font-size:16px;
-    font-weight:600;
-    margin-bottom:4px;
-}
-
-.sub {
-    text-align:center;
-    font-size:12px;
-    color:#9CA3AF;
-    margin-bottom:8px;
-}
-
-.box {
-    background:#1F2933;
-    border-radius:8px;
-    padding:6px 0;
-    text-align:center;
-    line-height:1.15;
-}
-
-.date {
-    font-size:12px;
-    font-weight:700;
+    box-shadow:0 4px 14px rgba(0,0,0,.4);
     color:white;
+    cursor:pointer;
 }
-
-.shift {
-    font-size:11px;
-    font-weight:600;
-}
-
-.time {
-    font-size:9px;
-    color:#D1D5DB;
-}
-
-.holiday {
-    font-size:9px;
-    color:#F87171;
-    font-weight:700;
-    margin-top:2px;
-}
+.day {font-size:18px;font-weight:bold;}
+.shift {font-size:15px;font-weight:600;margin-top:6px;}
+.time {font-size:12px;opacity:.85;}
+.holiday {font-size:11px;color:#f87171;}
 </style>
 """, unsafe_allow_html=True)
 
-# =============================
-# LOAD DATA
-# =============================
-BASE_DIR = os.path.dirname(__file__)
-df = pd.read_csv(os.path.join(BASE_DIR, "jadwal.csv"))
+# =====================
+# MODE 1 TAHUN
+# =====================
+for month in range(1, 13):
 
-# =============================
-# PILIH KARYAWAN
-# =============================
-nama = st.selectbox("Nama", df["Nama"].unique())
-row = df[df["Nama"] == nama].iloc[0]
+    st.subheader(f"📅 {calendar.month_name[month]} {year}")
 
-st.markdown(f"<div class='sub'>{row['Jabatan']}</div>", unsafe_allow_html=True)
+    days = calendar.monthrange(year, month)[1]
 
-# =============================
-# SESSION STATE BULAN & TAHUN
-# =============================
-today = date.today()
+    cols = st.columns(7)
 
-if "month" not in st.session_state:
-    st.session_state.month = today.month
-    st.session_state.year = today.year
+    for day in range(1, days + 1):
 
-# =============================
-# NAVIGASI BULAN
-# =============================
-colA, colB, colC = st.columns([1, 3, 1])
+        col = cols[(day - 1) % 7]
 
-with colA:
-    if st.button("⏮"):
-        if st.session_state.month == 1:
-            st.session_state.month = 12
-            st.session_state.year -= 1
-        else:
-            st.session_state.month -= 1
+        val = str(row.get(str(day), "OFF"))
+        shift = SHIFT_MAP.get(val, SHIFT_MAP["OFF"])
 
-with colC:
-    if st.button("⏭"):
-        if st.session_state.month == 12:
-            st.session_state.month = 1
-            st.session_state.year += 1
-        else:
-            st.session_state.month += 1
+        date_obj = datetime(year, month, day)
+        holiday_name = id_holidays.get(date_obj)
 
-bulan = st.session_state.month
-tahun = st.session_state.year
+        with col:
 
-st.markdown(
-    f"<div class='title'>📅 {calendar.month_name[bulan]} {tahun}</div>",
-    unsafe_allow_html=True
-)
+            if st.button(f"{day}", key=f"{month}-{day}"):
 
-# =============================
-# SHIFT INFO
-# =============================
-SHIFT_INFO = {
-    "1": ("Malam", "22:00–06:00", "#22C55E"),
-    "2": ("Pagi", "08:00–17:00", "#3B82F6"),
-    "3": ("Sore", "16:00–01:00", "#F59E0B"),
-    "OFF": ("OFF", "", "#EF4444")
-}
+                st.popup(
+                    f"Detail {day}-{month}-{year}",
+                    lambda: st.write(
+                        f"""
+                        👤 {nama}
+                        
+                        🕒 {shift['name']}
+                        
+                        ⏰ {shift['time']}
+                        
+                        🎉 {holiday_name if holiday_name else 'Bukan hari libur'}
+                        """
+                    )
+                )
 
-# =============================
-# LIBUR NASIONAL
-# =============================
-ID_HOLIDAYS = holidays.Indonesia()
-
-def cek_libur(tgl: date):
-    if tgl in ID_HOLIDAYS:
-        return ID_HOLIDAYS[tgl]
-    if tgl.weekday() == 6:
-        return "Hari Minggu"
-    return None
-
-# =============================
-# KALENDER
-# =============================
-cal = calendar.monthcalendar(tahun, bulan)
-
-for week in cal:
-    cols = st.columns(7, gap="small")
-    for i, day in enumerate(week):
-        if day == 0:
-            cols[i].write("")
-        else:
-            tgl = date(tahun, bulan, day)
-            libur = cek_libur(tgl)
-
-            raw = str(row.get(str(day), ""))
-            label, jam, color = SHIFT_INFO.get(raw, ("", "", "#6B7280"))
-
-            cols[i].markdown(
+            st.markdown(
                 f"""
-                <div class="box">
-                    <div class="date">{day}</div>
-                    <div class="shift" style="color:{color}">{label}</div>
-                    <div class="time">{jam}</div>
-                    {f"<div class='holiday'>🎌 {libur}</div>" if libur else ""}
+                <div class="card">
+                    <div class="day">{day}</div>
+                    <div class="shift" style="color:{shift['color']}">
+                        {shift['name']}
+                    </div>
+                    <div class="time">{shift['time']}</div>
+                    <div class="holiday">
+                        {"🎉 " + holiday_name if holiday_name else ""}
+                    </div>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
