@@ -4,139 +4,100 @@ import os
 import calendar
 
 # =============================
-# CONFIG PAGE
+# PAGE CONFIG
 # =============================
-st.set_page_config(page_title="Jadwal Shift Premium", layout="wide")
+st.set_page_config(page_title="Jadwal Shift", layout="wide")
 
 # =============================
-# CUSTOM CSS (MODERN UI)
+# CSS SUPER COMPACT (HP)
 # =============================
 st.markdown("""
 <style>
-.card {
-    background-color: #1E1E2F;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0px 8px 20px rgba(0,0,0,0.3);
-    text-align: center;
-    color: white;
-    font-weight: 600;
+body {
+    background-color:#0E1117;
 }
-.header-card {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    padding: 25px;
-    border-radius: 20px;
-    color: white;
-    text-align: center;
-    margin-bottom: 30px;
+.title {
+    text-align:center;
+    font-size:16px;
+    font-weight:600;
+    margin-bottom:6px;
 }
-.shift-box {
-    padding: 20px;
-    border-radius: 15px;
-    text-align: center;
-    font-weight: bold;
-    color: white;
+.sub {
+    text-align:center;
+    font-size:12px;
+    color:#9CA3AF;
+    margin-bottom:10px;
+}
+.box {
+    padding:4px 0;
+    border-radius:6px;
+    text-align:center;
+    font-size:11px;
+    font-weight:600;
+    color:white;
+}
+select {
+    font-size:13px !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📅 Jadwal Shift - Februari 2026")
+st.markdown("<div class='title'>📅 Februari 2026</div>", unsafe_allow_html=True)
 
 # =============================
-# LOAD CSV
+# LOAD DATA
 # =============================
 BASE_DIR = os.path.dirname(__file__)
-file_path = os.path.join(BASE_DIR, "jadwal.csv")
-
-try:
-    df = pd.read_csv(file_path)
-except FileNotFoundError:
-    st.error("File jadwal.csv tidak ditemukan.")
-    st.stop()
+df = pd.read_csv(os.path.join(BASE_DIR, "jadwal.csv"))
 
 # =============================
 # PILIH KARYAWAN
 # =============================
-nama = st.selectbox("Pilih Karyawan", df["Nama"].unique())
-data = df[df["Nama"] == nama].iloc[0]
+nama = st.selectbox("Nama", df["Nama"].unique())
+row = df[df["Nama"] == nama].iloc[0]
+
+st.markdown(
+    f"<div class='sub'>{row['Jabatan']}</div>",
+    unsafe_allow_html=True
+)
 
 # =============================
-# HEADER INFO CARD
+# WARNA SHIFT (MINIMAL)
 # =============================
-st.markdown(f"""
-<div class="header-card">
-    <h2>{data['Nama']}</h2>
-    <p>{data['Jabatan']}</p>
-</div>
-""", unsafe_allow_html=True)
+def color(v):
+    return {
+        "OFF": "#DC2626",
+        "1": "#16A34A",
+        "2": "#2563EB",
+        "3": "#F59E0B"
+    }.get(str(v), "#374151")
 
 # =============================
-# WARNA SHIFT
+# KALENDER SUPER PADAT
 # =============================
-def get_color(val):
-    if val == "OFF":
-        return "#E74C3C"
-    elif str(val) == "1":
-        return "#2ECC71"
-    elif str(val) == "2":
-        return "#3498DB"
-    elif str(val) == "3":
-        return "#F39C12"
-    return "#7F8C8D"
+cal = calendar.monthcalendar(2026, 2)
 
-# =============================
-# KALENDER GRID
-# =============================
-year = 2026
-month = 2
-cal = calendar.monthcalendar(year, month)
-
-days_name = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
-
-# Header Hari
-cols = st.columns(7)
-for col, day in zip(cols, days_name):
-    col.markdown(f"<div class='card'>{day}</div>", unsafe_allow_html=True)
-
-# Isi Kalender
 for week in cal:
-    cols = st.columns(7)
+    cols = st.columns(7, gap="small")
     for i, day in enumerate(week):
         if day == 0:
             cols[i].write("")
         else:
-            shift_val = data[str(day)]
-            color = get_color(shift_val)
-
+            val = row[str(day)]
             cols[i].markdown(
                 f"""
-                <div class="shift-box" style="background-color:{color}">
-                    <div style="font-size:18px;">{day}</div>
-                    <div style="font-size:16px;">{shift_val}</div>
+                <div class="box" style="background:{color(val)}">
+                    {day}<br>{val}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
 # =============================
-# RINGKASAN
+# RINGKASAN MINI
 # =============================
-total_off = sum(1 for d in range(1,29) if data[str(d)] == "OFF")
-
-st.markdown("---")
-st.markdown(f"""
-<div class="card">
-    Total OFF Bulan Ini: {total_off} Hari
-</div>
-""", unsafe_allow_html=True)
-
-# =============================
-# LEGENDA
-# =============================
-st.markdown("### 🎨 Keterangan Warna")
-st.markdown("""
-🟢 Shift 1  
-🔵 Shift 2  
-🟠 Shift 3  
-🔴 OFF  
-""")
+off_count = sum(row[str(d)] == "OFF" for d in range(1, 29))
+st.markdown(
+    f"<div class='sub'>OFF: {off_count} hari</div>",
+    unsafe_allow_html=True
+)
