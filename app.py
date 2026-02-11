@@ -1,19 +1,17 @@
 import streamlit as st
 import pandas as pd
 import os
+import calendar
+from datetime import datetime
 
 # =============================
-# KONFIGURASI HALAMAN
+# KONFIGURASI
 # =============================
-st.set_page_config(
-    page_title="Jadwal Shift Februari 2026",
-    layout="wide"
-)
-
-st.title("📅 Jadwal Shift Februari 2026")
+st.set_page_config(page_title="Jadwal Februari 2026", layout="wide")
+st.title("📅 Jadwal Shift - Februari 2026")
 
 # =============================
-# LOAD FILE CSV (AMAN UNTUK CLOUD)
+# LOAD CSV
 # =============================
 BASE_DIR = os.path.dirname(__file__)
 file_path = os.path.join(BASE_DIR, "jadwal.csv")
@@ -21,24 +19,79 @@ file_path = os.path.join(BASE_DIR, "jadwal.csv")
 try:
     df = pd.read_csv(file_path)
 except FileNotFoundError:
-    st.error("❌ File jadwal.csv tidak ditemukan. Pastikan file ada di folder yang sama dengan app.py")
+    st.error("File jadwal.csv tidak ditemukan.")
     st.stop()
 
 # =============================
-# TAMPILKAN DATA
+# PILIH NAMA
 # =============================
-st.success("✅ Data berhasil dimuat")
-
-st.dataframe(df, use_container_width=True)
+nama = st.selectbox("Pilih Karyawan", df["Nama"].unique())
+data_karyawan = df[df["Nama"] == nama].iloc[0]
 
 # =============================
-# FILTER BERDASARKAN NAMA
+# WARNA SHIFT
 # =============================
-st.subheader("🔍 Filter Jadwal Karyawan")
+def get_color(value):
+    if value == "OFF":
+        return "#FF4B4B"
+    elif str(value) == "1":
+        return "#4CAF50"
+    elif str(value) == "2":
+        return "#2196F3"
+    elif str(value) == "3":
+        return "#FF9800"
+    else:
+        return "#CCCCCC"
 
-nama_list = df["Nama"].unique()
-selected_nama = st.selectbox("Pilih Nama:", nama_list)
+# =============================
+# BUAT KALENDER
+# =============================
+year = 2026
+month = 2
 
-filtered_df = df[df["Nama"] == selected_nama]
+cal = calendar.monthcalendar(year, month)
+days_name = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
 
-st.dataframe(filtered_df, use_container_width=True)
+# Header Hari
+cols = st.columns(7)
+for col, day in zip(cols, days_name):
+    col.markdown(f"**{day}**")
+
+# Isi Kalender
+for week in cal:
+    cols = st.columns(7)
+    for i, day in enumerate(week):
+        if day == 0:
+            cols[i].write("")
+        else:
+            shift_value = data_karyawan[str(day)]
+            color = get_color(shift_value)
+
+            cols[i].markdown(
+                f"""
+                <div style="
+                    background-color:{color};
+                    padding:15px;
+                    border-radius:10px;
+                    text-align:center;
+                    color:white;
+                    font-weight:bold;
+                ">
+                    {day}<br>
+                    {shift_value}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+# =============================
+# LEGENDA
+# =============================
+st.markdown("---")
+st.markdown("### Keterangan:")
+st.markdown("""
+- 🟢 Shift 1  
+- 🔵 Shift 2  
+- 🟠 Shift 3  
+- 🔴 OFF  
+""")
