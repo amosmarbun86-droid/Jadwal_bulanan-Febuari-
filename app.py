@@ -1,170 +1,126 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from datetime import date, timedelta
+from io import BytesIO
 
-st.set_page_config(page_title="Jadwal Shift", layout="wide")
+st.set_page_config(page_title="Jadwal Februari 2026", layout="centered")
 
-# =====================
-# LOAD USERS
-# =====================
-users = pd.read_csv("users.csv")
+st.title("📅 JADWAL KERJA")
+st.subheader("FEBRUARI 2026")
 
-# =====================
-# LOGIN
-# =====================
-if "login" not in st.session_state:
-    st.session_state.login = False
+# ==========================
+# DATA SESUAI GAMBAR
+# ==========================
 
-if not st.session_state.login:
-    st.title("🔐 Login Jadwal Shift")
+karyawan = [
+    ("Jhody ansyah Setiawan", "SHIFT LEAD"),
+    ("Deni Simanjuntak", "SHIFT LEAD"),
+    ("Sucris Juliyisno Panjaitan", "TEAM LEAD"),
+    ("Marlin Simboling", "TEAM LEAD"),
+    ("Wilfan Ependi Sibuea", "TEAM LEAD"),
+    ("Judika Hutagaol", "ADMIN / TRACER"),
+    ("Monang Josua Silaban", "SOC PIC"),
+    ("Alex Sanro Manalu", "DED OPERATOR"),
+    ("AMOS", "DED OPERATOR"),
+    ("EGI SIMANUNGKALIT", "DED OPERATOR"),
+    ("ROBERT NAINGGOLAN", "DED OPERATOR"),
+    ("SHALMAN TEGAR HUTASOIT", "DED OPERATOR"),
+    ("FREDRIK HUTAJULU", "DED OPERATOR"),
+    ("JONNI PARDOMUAN SITUMEANG", "DED OPERATOR"),
+    ("Lindon Rajagukguk", "DED OPERATOR"),
+    ("PEBY AGUSTINUS TARIGAN", "DED OPERATOR"),
+    ("YOSUA KEVIN RAJAGUKGUK", "DED OPERATOR"),
+    ("TONGAM JANUARI PARLINDUNGAN SIANIPAR", "SOC PIC"),
+]
 
-    u = st.text_input("Username")
-    p = st.text_input("Password", type="password")
+bulan = 2
+tahun = 2026
+jumlah_hari = calendar.monthrange(tahun, bulan)[1]
 
-    if st.button("Login"):
-        user = users[(users.username == u) & (users.password == p)]
-        if not user.empty:
-            st.session_state.login = True
-            st.session_state.role = user.iloc[0].role
-            st.session_state.nama = user.iloc[0].nama
-            st.success("Login berhasil")
-            st.rerun()
-        else:
-            st.error("Username / Password salah")
+# ==========================
+# POLA SHIFT SESUAI GAMBAR
+# ==========================
 
-    st.stop()
+pola = [
+    "OFF", "3", "3", "3",
+    "OFF", "2", "2", "2",
+    "OFF", "1", "1", "1"
+]
 
-# =====================
-# AUTO TAHUN & CSV
-# =====================
-tahun = date.today().year
-df = pd.read_csv(f"jadwal_{tahun}.csv")
+data = []
 
-SHIFT_INFO = {
-    "1": ("🌙 Malam", "22:00–06:00", "#6366F1"),
-    "2": ("🌅 Pagi", "08:00–16:00", "#22C55E"),
-    "3": ("🌇 Sore", "16:00–01:00", "#F97316"),
-    "OFF": ("❌ OFF", "", "#EF4444")
-}
+for idx, (nama, title) in enumerate(karyawan):
+    row = {
+        "NO": idx + 1,
+        "NAMA": nama,
+        "TITLE": title
+    }
 
-LIBUR_NASIONAL = {
-    "01-01": "🎉 Tahun Baru",
-    "02-10": "🎉 Imlek",
-    "03-29": "🎉 Nyepi",
-    "04-18": "🎉 Wafat Isa Almasih",
-    "05-01": "🎉 Hari Buruh",
-    "08-17": "🎉 HUT RI 🇮🇩",
-    "12-25": "🎉 Natal"
-}
+    for i in range(jumlah_hari):
+        shift = pola[(i + idx) % len(pola)]
+        row[str(i+1)] = shift
 
-# =====================
-# HEADER
-# =====================
-st.sidebar.success(f"👤 {st.session_state.nama}")
-if st.sidebar.button("Logout"):
-    st.session_state.clear()
-    st.rerun()
+    data.append(row)
 
-st.title(f"📅 Jadwal Shift {tahun}")
+df = pd.DataFrame(data)
 
-# =====================
-# FILTER USER
-# =====================
-if st.session_state.role == "user":
-    df = df[df["NAMA"] == st.session_state.nama]
+# ==========================
+# REKAP
+# ==========================
 
-# =====================
-# NOTIFIKASI BESOK
-# =====================
-besok = date.today() + timedelta(days=1)
-tgl_besok = str(besok.day)
+df["Shift 1"] = df.apply(lambda x: list(x).count("1"), axis=1)
+df["Shift 2"] = df.apply(lambda x: list(x).count("2"), axis=1)
+df["Shift 3"] = df.apply(lambda x: list(x).count("3"), axis=1)
+df["OFF"] = df.apply(lambda x: list(x).count("OFF"), axis=1)
 
-st.info(f"🔔 Shift BESOK ({besok.strftime('%d %B %Y')})")
-for _, r in df.iterrows():
-    kode = str(r[tgl_besok])
-    nama, jam, _ = SHIFT_INFO.get(kode, ("", "", ""))
-    st.write(f"• {r['NAMA']} → {nama} {jam}")
+# ==========================
+# WARNA SHIFT
+# ==========================
 
-# =====================
-# KALENDER 1 TAHUN
-# =====================
-for bulan in range(1, 13):
-    st.markdown("---")
-    st.subheader(f"📆 {calendar.month_name[bulan]}")
+def warna_shift(val):
+    if val == "OFF":
+        return "background-color: red; color: white"
+    elif val == "1":
+        return "background-color: #90EE90"
+    elif val == "2":
+        return "background-color: #FFFF99"
+    elif val == "3":
+        return "background-color: #ADD8E6"
+    return ""
 
-    hari_bulan = calendar.monthrange(tahun, bulan)[1]
-    cols = st.columns(7)
-    hari = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
+styled_df = df.style.applymap(warna_shift)
 
-    for i, h in enumerate(hari):
-        cols[i].markdown(f"**{h}**")
+# ==========================
+# TAMPILAN MOBILE
+# ==========================
 
-    start = date(tahun, bulan, 1).weekday()
-    row = cols
+tab1, tab2 = st.tabs(["📋 Jadwal", "📊 Rekap"])
 
-    for i in range(start):
-        row[i].markdown(" ")
+with tab1:
+    st.dataframe(styled_df, use_container_width=True, height=500)
 
-    for tgl in range(1, hari_bulan + 1):
-        col = (start + tgl - 1) % 7
-        label = str(tgl)
-
-        key_libur = f"{bulan:02d}-{tgl:02d}"
-        if key_libur in LIBUR_NASIONAL:
-            label += f"\n{LIBUR_NASIONAL[key_libur]}"
-
-        if row[col].button(label, key=f"{bulan}-{tgl}"):
-            st.session_state.popup = (bulan, tgl)
-
-        if col == 6:
-            row = st.columns(7)
-
-# =====================
-# POPUP DETAIL
-# =====================
-if "popup" in st.session_state:
-    bulan, tgl = st.session_state.popup
-    st.markdown("---")
-    st.subheader(f"📌 Detail Shift {tgl} {calendar.month_name[bulan]}")
-
-    for _, r in df.iterrows():
-        kode = str(r[str(tgl)])
-        nama, jam, warna = SHIFT_INFO.get(kode, ("", "", "#999"))
-
-        st.markdown(
-            f"""
-            <div style="padding:10px;
-                        border-left:5px solid {warna};
-                        background:#0f172a;
-                        margin-bottom:6px;
-                        border-radius:8px;
-                        color:white;">
-                <b>{r['NAMA']}</b><br>
-                <span style="color:{warna}">{nama}</span><br>
-                <small>{jam}</small>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    if st.button("❌ Tutup"):
-        del st.session_state.popup
-
-# =====================
-# ADMIN PANEL
-# =====================
-if st.session_state.role == "admin":
-    st.sidebar.markdown("## 🛠️ Admin Panel")
-
-    upload = st.sidebar.file_uploader("Upload CSV Baru", type="csv")
-    if upload:
-        with open(f"jadwal_{tahun}.csv", "wb") as f:
-            f.write(upload.getbuffer())
-        st.sidebar.success("CSV berhasil diupdate")
-
-    st.sidebar.download_button(
-        "⬇️ Download CSV",
-        data=df.to_csv(index=False),
-        file_name=f"jadwal_{tahun}.csv"
+with tab2:
+    st.dataframe(
+        df[["NAMA", "Shift 1", "Shift 2", "Shift 3", "OFF"]],
+        use_container_width=True
     )
+
+# ==========================
+# DOWNLOAD EXCEL
+# ==========================
+
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
+
+excel_data = to_excel(df)
+
+st.download_button(
+    "📥 Download Excel",
+    data=excel_data,
+    file_name="Jadwal_Februari_2026.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    use_container_width=True
+)
